@@ -5,7 +5,7 @@ Forløbet pr. item:
 1. Webformens id læses af itemets data, og kun webforms i
    ``intake_config.WEBFORMS`` behandles.
 2. Svaret hentes friskt fra OS2Forms ud fra itemets reference (svarets uuid).
-3. Webformens filfelter hentes via deres links i ``data["attachments"]``.
+3. Webformens filfelter hentes via deres links i ``data["linked"]``.
 4. Indsendelsen bygges som Remote post-formen og sendes til aktindsigt.
 
 Udfald:
@@ -23,6 +23,7 @@ Beskeder og logs indeholder aldrig formularens indhold.
 import logging
 import mimetypes
 from functools import cache
+from urllib.parse import unquote, urlsplit
 
 from mbu_rpa_core.exceptions import BusinessError, ProcessError
 
@@ -73,26 +74,41 @@ def _foerste(value: object) -> object:
     return value
 
 
-def _mime(vedhaeftning: dict, navn: str, content_type: str) -> str:
-    """Afgør en vedhæftnings mime-type.
-
-    OS2Forms' ``type`` er ofte en filendelse (``pdf``), ikke en mime-type.
+def _mime(fil_info: dict, navn: str, content_type: str) -> str:
+    """Afgør en uploadet fils mime-type.
 
     Args:
-        vedhaeftning: Vedhæftningens post fra ``data["attachments"]``.
-        navn: Filnavnet.
-        content_type: ``Content-Type`` fra OS2Forms' filsvar.
+        fil_info: Filens post fra ``data["linked"][<element>][<fil-id>]``.
+        navn: Filens navn; endelsen bruges, når intet andet siger noget.
+        content_type: ``Content-Type`` fra hentningen af filen.
 
     Returns:
         En mime-type. ``application/octet-stream`` hvis intet kan udledes.
     """
-    typ = str(vedhaeftning.get("type") or vedhaeftning.get("mime") or "")
-    if "/" in typ:
-        return typ
+    mime = str(fil_info.get("mime_type") or "").strip()
+    if "/" in mime:
+        return mime
     if "/" in content_type:
         return content_type
-    guessed, _ = mimetypes.guess_type(navn if "." in navn else f"fil.{typ}")
+    guessed, _ = mimetypes.guess_type(navn)
     return guessed or "application/octet-stream"
+
+
+def _filnavn(url: str, element: str) -> str:
+    """Filens navn, taget af URL'ens sidste led.
+
+    ``data["linked"]`` har intet filnavn, men OS2Forms gemmer filen under
+    dens oprindelige navn, som derfor står sidst i URL'en.
+
+    Args:
+        url: Filens URL.
+        element: Filelementets maskinnavn; bruges, når URL'en intet navn har.
+
+    Returns:
+        Filnavnet, eller ``<element>.pdf``.
+    """
+    sidste = unquote(urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1])
+    return sidste or f"{element}.pdf"
 
 
 def hent_filblokke(
@@ -100,10 +116,12 @@ def hent_filblokke(
     config: intake_config.WebformConfig,
     api_key: str,
 ) -> list[remote_post.Filblok]:
-    """Henter webformens vedhæftninger fra OS2Forms.
+    """Henter webformens uploadede filer fra OS2Forms.
 
-    Et filfelt uden værdi i ``data`` er en formular uden fil, og giver ingen
-    blok.
+    Et filelements værdi i ``data`` er filens id. Filens URL og mime-type står
+    i ``data["linked"][<element>][<fil-id>]``. ``data["attachments"]`` er de
+    PDF'er, OS2Forms selv genererer (kvitteringer), og bruges ikke. Et
+    filfelt uden værdi er en formular uden fil og giver ingen blok.
 
     Args:
         data: ``data`` fra webform_rest-svaret.
@@ -115,43 +133,45 @@ def hent_filblokke(
 
     Raises:
         BusinessError: Hvis et udfyldt filfelt ikke har et link i
-            ``data["attachments"]``, eller filen ikke findes i OS2Forms.
+            ``data["linked"]``, eller filen ikke findes i OS2Forms.
         ProcessError: Hvis OS2Forms ikke kunne spørges.
     """
-    vedhaeftninger = data.get(remote_post.ATTACHMENTS_KEY)
-    if not isinstance(vedhaeftninger, dict):
-        vedhaeftninger = {}
+    linked = data.get(remote_post.LINKED_KEY)
+    if not isinstance(linked, dict):
+        linked = {}
 
     blokke = []
     for element, blok in config.filfelter.items():
         fil_id = _foerste(data.get(element))
         if fil_id in (None, ""):
             continue
+        fil_id = str(fil_id)
 
-        post = _foerste(vedhaeftninger.get(element))
-        url = post.get("url") if isinstance(post, dict) else None
+        filer = linked.get(element)
+        fil_info = filer.get(fil_id) if isinstance(filer, dict) else None
+        url = fil_info.get("url") if isinstance(fil_info, dict) else None
         if not isinstance(url, str) or not url:
             raise BusinessError(
                 f"Filfeltet {element!r} er udfyldt, men svaret har intet link "
-                "til filen i data.attachments"
+                "til filen i data.linked"
             )
 
         try:
             fil = os2forms.fetch_attachment(url, api_key)
         except os2forms.OS2FormsNotFound as e:
             raise BusinessError(
-                f"Vedhæftningen i {element!r} findes ikke i OS2Forms"
+                f"Den uploadede fil i {element!r} findes ikke i OS2Forms"
             ) from e
         except os2forms.OS2FormsError as e:
             raise ProcessError(str(e)) from e
 
-        navn = str(post.get("name") or post.get("filename") or f"{element}.pdf")
+        navn = _filnavn(url, element)
         blokke.append(
             remote_post.Filblok(
                 blok=blok,
-                fil_id=str(fil_id),
+                fil_id=fil_id,
                 navn=navn,
-                mime=_mime(post, navn, fil.content_type),
+                mime=_mime(fil_info, navn, fil.content_type),
                 indhold=fil.indhold,
             )
         )

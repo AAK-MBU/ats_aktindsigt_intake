@@ -24,7 +24,7 @@ OS2Forms ◄── poll ── os2forms-polling-service ──► ATS intake-kø
 ### Pr. item
 1. Webformens id læses af itemets data: `webformId` fra en payload med kun referencer, ellers `entity.webform_id[0].target_id` fra et rå webform_rest-svar. Kun webforms i `WEBFORMS` behandles.
 2. Svaret hentes friskt fra OS2Forms med itemets reference (svarets uuid). Itemets egne data bruges ikke som formulardata.
-3. For hvert filfelt i webformens konfiguration, der har en værdi, hentes filen via linket i `data.attachments`.
+3. For hvert filfelt i webformens konfiguration, der har en værdi (filens id), hentes filen via linket i `data.linked.<element>.<fil-id>`. Filnavnet tages af URL'ens sidste led, mime-typen af `mime_type`. `data.attachments` (OS2Forms' genererede kvitteringer) og `data.linked` sendes ikke videre.
 4. Kroppen bygges af `processes/remote_post.build_form_items` som `application/x-www-form-urlencoded`:
    - `webform_id` og formularens felter med elementnavnene
    - lister som `navn[0]` og sammensatte elementer som `navn[nøgle]`
@@ -85,7 +85,7 @@ Værdier med præfikset `UDFYLDES_` er pladsholdere. `validate_config()` afviser
 
 | Kilde | Adgang |
 |---|---|
-| OS2Forms `GET /webform_rest/{webform_id}/submission/{uuid}` | svaret (`data`, `data.attachments`) |
+| OS2Forms `GET /webform_rest/{webform_id}/submission/{uuid}` | svaret (`data`, `data.linked`) |
 | OS2Forms: vedhæftningens URL | filens bytes |
 | Aktindsigt `POST /api/intake/sager` | opretter sagen, svarer `{"sagId"}` |
 | `[rpa].[Credentials]`, `[rpa].[Constants]` via `mbu_rpa_core.RPAConnection` | api-nøgler og mail-opsætning |

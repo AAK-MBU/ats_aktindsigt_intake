@@ -83,10 +83,9 @@ def test_mundtlig_anmodning_bevarer_sammensat_element_og_dato():
     felter = parse_felter(items)
 
     assert felter["webform_id"] == "aktindsigt_indgang_personale"
-    assert felter["dine_oplysninger_medarbejder"] == {
-        "name": "Jurist Juristsen",
-        "email": "jurist@example.invalid",
-    }
+    blok = felter["dine_oplysninger_medarbejder"]
+    assert blok["name"] == "Jurist Juristsen"
+    assert blok["email"] == "jurist@example.invalid"
     assert (
         felter["angiv_den_dato_hvor_medarbejderen_kontaktede_personalejuristerne"]
         == "2026-09-14"

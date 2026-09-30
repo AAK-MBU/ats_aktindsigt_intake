@@ -23,6 +23,7 @@ from dataclasses import dataclass
 # Nøglen i webform_rest-svarets ``data``, der bærer vedhæftningernes links. Den
 # er ikke et formularfelt og sendes ikke med.
 ATTACHMENTS_KEY = "attachments"
+LINKED_KEY = "linked"
 
 WEBFORM_ID_FELT = "webform_id"
 SUBMISSION_UUID_FELT = "submission_uuid"
@@ -95,8 +96,9 @@ def build_form_items(
     Args:
         webform_id: Webformens maskinnavn.
         submission_uuid: Svarets uuid (workitem'ets reference).
-        data: ``data`` fra webform_rest-svaret. ``attachments`` springes
-            over; de øvrige nøgler sendes som felter.
+        data: ``data`` fra webform_rest-svaret. ``attachments`` (genererede
+            kvitteringer) og ``linked`` (filernes metadata) springes over; de
+            øvrige nøgler sendes som felter.
         filblokke: De hentede vedhæftninger.
 
     Returns:
@@ -106,7 +108,7 @@ def build_form_items(
     """
     items: list[tuple[str, str]] = [(WEBFORM_ID_FELT, webform_id)]
     for key, value in data.items():
-        if key in (ATTACHMENTS_KEY, WEBFORM_ID_FELT, SUBMISSION_UUID_FELT):
+        if key in (ATTACHMENTS_KEY, LINKED_KEY, WEBFORM_ID_FELT, SUBMISSION_UUID_FELT):
             continue
         items.extend(flatten(key, value))
     for fil in filblokke:

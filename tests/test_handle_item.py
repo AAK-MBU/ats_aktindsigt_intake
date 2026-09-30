@@ -8,6 +8,7 @@ from ats_framework.processes import handle_item
 from tests.aktindsigt_reference import fuldmagt_bytes, parse_felter
 from tests.testdata import (
     EGEN_ANMODNING,
+    FIL_ID,
     FIL_URL,
     MUNDTLIG_ANMODNING,
     PAA_ANDRES_VEGNE,
@@ -87,11 +88,35 @@ def test_fuldmagt_hentes_og_sendes_base64(kald):
     felter = parse_felter(log["sendt"][0][0])
     assert fuldmagt_bytes(felter, "_upload_fuldmagt") == SMALL_PDF
     assert felter["_upload_fuldmagt"]["mime"] == "application/pdf"
+    assert felter["_upload_fuldmagt"]["id"] == FIL_ID
 
 
-def test_mime_udledes_af_endelsen_naar_type_og_header_mangler(kald):
+def test_filnavnet_tages_af_url_ens_sidste_led(kald):
     state, log = kald
     state["svar"] = svar(PAA_ANDRES_VEGNE)
+
+    handle_item.handle_item({"webformId": MEDARBEJDER}, UUID)
+
+    felter = parse_felter(log["sendt"][0][0])
+    assert felter["_upload_fuldmagt"]["name"] == "fuldmagt underskrevet.pdf"
+
+
+def test_kvitteringer_og_linked_hentes_og_sendes_ikke(kald):
+    state, log = kald
+    state["svar"] = svar(PAA_ANDRES_VEGNE)
+
+    handle_item.handle_item({"webformId": MEDARBEJDER}, UUID)
+
+    # Kun den uploadede fil hentes, ikke OS2Forms' genererede kvitteringer.
+    assert log["attachment"] == [(FIL_URL, "key-os2_api")]
+    navne = [navn for navn, _ in log["sendt"][0][0]]
+    assert not any(n.startswith(("attachments", "linked")) for n in navne)
+
+
+def test_mime_udledes_af_endelsen_naar_mime_type_og_header_mangler(kald):
+    state, log = kald
+    uden_mime = {FIL_ID: {"id": FIL_ID, "url": FIL_URL, "mime_type": ""}}
+    state["svar"] = svar({**PAA_ANDRES_VEGNE, "linked": {"upload_fuldmagt": uden_mime}})
     state["fil"] = os2forms.Fil(indhold=SMALL_PDF, content_type="")
 
     handle_item.handle_item({"webformId": MEDARBEJDER}, UUID)
@@ -162,7 +187,7 @@ def test_svar_uden_formulardata_er_forretningsfejl(kald):
 
 def test_udfyldt_filfelt_uden_link_er_forretningsfejl(kald):
     state, log = kald
-    state["svar"] = svar({**PAA_ANDRES_VEGNE, "attachments": {}})
+    state["svar"] = svar({**PAA_ANDRES_VEGNE, "linked": {}})
 
     with pytest.raises(BusinessError, match="intet link"):
         handle_item.handle_item({"webformId": MEDARBEJDER}, UUID)
@@ -174,7 +199,7 @@ def test_manglende_fil_i_os2forms_er_forretningsfejl(kald):
     state["svar"] = svar(PAA_ANDRES_VEGNE)
     state["fil"] = os2forms.OS2FormsNotFound("404")
 
-    with pytest.raises(BusinessError, match="Vedhæftningen"):
+    with pytest.raises(BusinessError, match="uploadede fil"):
         handle_item.handle_item({"webformId": MEDARBEJDER}, UUID)
     assert log["sendt"] == []
 

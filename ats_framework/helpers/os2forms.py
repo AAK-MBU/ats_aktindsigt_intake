@@ -4,9 +4,12 @@ Kalder OS2Forms' REST-API (``os2forms_rest_api``) med headeren ``api-key``:
 
 - ``GET {base}/webform_rest/{webform_id}/submission/{uuid}`` giver svaret som
   ``{"entity": {...}, "data": {...}}``. ``data`` er formularens felter med
-  elementernes maskinnavne som nøgler; vedhæftninger står under
-  ``data["attachments"]`` som ``{"<element>": {"name", "type", "url"}}``.
-- ``GET <vedhæftningens url>`` med samme header giver filens bytes.
+  elementernes maskinnavne som nøgler. Et filelements værdi er filens id, og
+  filens metadata står under ``data["linked"]`` som
+  ``{"<element>": {"<fil-id>": {"id", "url", "mime_type", "size"}}}``.
+  ``data["attachments"]`` er de PDF'er, OS2Forms selv genererer
+  (kvitteringer).
+- ``GET <filens url>`` med samme header giver filens bytes.
 
 HTTP-fejl oversættes til ``OS2FormsNotFound`` (404: svaret eller filen findes
 ikke) og ``OS2FormsError`` (alt andet: login, serverfejl, netværk).
@@ -112,7 +115,7 @@ def fetch_attachment(url: str, api_key: str) -> Fil:
     """Henter en vedhæftning.
 
     Args:
-        url: Vedhæftningens URL fra ``data["attachments"]``.
+        url: Filens URL fra ``data["linked"]``.
         api_key: OS2Forms' api-key.
 
     Returns:

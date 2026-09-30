@@ -47,9 +47,9 @@ class WebformConfig:
 # webform_id → konfiguration. Kun disse webforms behandles; et svar på en
 # anden webform afvises som forretningsfejl.
 #
-# Elementnavnet ``upload_fuldmagt`` er udledt af Remote post-blokken
-# ``_upload_fuldmagt`` (Remote post navngiver filblokken ``_`` + elementets
-# maskinnavn) og er ikke verificeret mod webformens konfiguration i OS2Forms.
+# ``upload_fuldmagt`` er webformens ``managed_file``-element til fuldmagten (én
+# fil). Remote post navngiver filblokken ``_`` + elementets maskinnavn, og det
+# er den blok, aktindsigt læser. Personaleformularen har intet filelement.
 WEBFORMS: dict[str, WebformConfig] = {
     "aktindsigt_medarbejder_indgang_p": WebformConfig(
         filfelter={"upload_fuldmagt": "_upload_fuldmagt"},

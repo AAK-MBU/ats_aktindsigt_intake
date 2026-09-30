@@ -21,10 +21,10 @@ OS2FORMS_CREDENTIAL = "os2_api"
 # Aktindsigt
 # ----------------------
 # Portalens backend, fx https://<vært>. Stien /api/intake/sager lægges til.
-AKTINDSIGT_BASE_URL = "UDFYLDES_aktindsigt_base_url"
+AKTINDSIGT_BASE_URL = "https://mbu-aktindsigt-dev.adm.aarhuskommune.dk"
 # Credential i rpa.Credentials, hvis password er aktindsigts intake-API-nøgle
 # (sendes i headeren X-API-Key).
-AKTINDSIGT_CREDENTIAL = "UDFYLDES_aktindsigt_credential"
+AKTINDSIGT_CREDENTIAL = "aktindsigt_intake_api_key"
 
 # Timeout i sekunder pr. HTTP-kald.
 HTTP_TIMEOUT = 60

@@ -91,6 +91,26 @@ def test_fuldmagt_hentes_og_sendes_base64(kald):
     assert felter["_upload_fuldmagt"]["id"] == FIL_ID
 
 
+def test_advokat_uden_uploadet_fuldmagt_sendes_uden_filblok(kald):
+    """En advokat har stillingsfuldmagt og uploader ingen fil."""
+    state, log = kald
+    advokat = {
+        **PAA_ANDRES_VEGNE,
+        "ansoegning_om_aktindsigt": "Advokat på vegne af medarbejderen",
+        "upload_fuldmagt": "",
+    }
+    del advokat["linked"]
+    state["svar"] = svar(advokat)
+
+    besked = handle_item.handle_item({"webformId": MEDARBEJDER}, UUID)
+
+    assert besked.startswith("Sag ")
+    assert log["attachment"] == []
+    felter = parse_felter(log["sendt"][0][0])
+    assert "_upload_fuldmagt" not in felter
+    assert felter["ansoegning_om_aktindsigt"] == "Advokat på vegne af medarbejderen"
+
+
 def test_filnavnet_tages_af_url_ens_sidste_led(kald):
     state, log = kald
     state["svar"] = svar(PAA_ANDRES_VEGNE)
